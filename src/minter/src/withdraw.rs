@@ -3,7 +3,6 @@ use crate::{
     events::WithdrawalEvent,
     guard::retrieve_sol_guard,
     logs::DEBUG,
-    sol_rpc_client::LedgerMemo,
     state::{audit::process_event, event::EventType, mutate_state, read_state, State},
 };
 
@@ -16,11 +15,9 @@ use ic_cdk::api::{
         sign_with_ecdsa, EcdsaCurve, EcdsaKeyId, SignWithEcdsaArgument, SignWithEcdsaResponse,
     },
 };
-use icrc_ledger_client_cdk::{CdkRuntime, ICRC1Client};
-use icrc_ledger_types::icrc2::transfer_from::{TransferFromArgs, TransferFromError};
+use icrc_ledger_types::icrc2::transfer_from::TransferFromError;
 use k256::ecdsa::{signature::Verifier, RecoveryId, Signature, VerifyingKey};
 use minicbor::{Decode, Encode};
-use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -194,43 +191,52 @@ async fn burn_gsol(
         amount,
     );
 
-    let ledger_canister_id = read_state(|s| s.ledger_id);
-    let client = ICRC1Client {
-        runtime: CdkRuntime,
-        ledger_canister_id,
-    };
+    // update event with the burn block index
+    event.update_after_burn(ic_cdk::api::time(), 0);
 
-    let args = TransferFromArgs {
-        spender_subaccount: None,
-        from: event.from_icp_address.into(),
-        to: ic_cdk::id().into(),
-        amount: event.amount.clone(),
-        fee: None,
-        created_at_time: Some(ic_cdk::api::time()),
-        memo: Some(LedgerMemo(event.get_burn_id()).into()),
-    };
+    process_withdrawal_burn_event(&event, None);
 
-    match client.transfer_from(args).await {
-        Ok(Ok(block_index)) => {
-            let burn_block_index = block_index
-                .0
-                .to_u64()
-                .expect("block index should fit into u64");
+    Ok(event.clone())
 
-            // update event with the burn block index
-            event.update_after_burn(ic_cdk::api::time(), burn_block_index);
+    // we are not doing burning here. but we will record it.
 
-            process_withdrawal_burn_event(&event, None);
+    // let ledger_canister_id = read_state(|s| s.ledger_id);
+    // let client = ICRC1Client {
+    //     runtime: CdkRuntime,
+    //     ledger_canister_id,
+    // };
 
-            Ok(event.clone())
-        }
-        Ok(Err(err)) => Err(WithdrawError::BurningGSolFailed(err)),
-        Err(err) => Err(WithdrawError::SendingMessageToLedgerFailed {
-            ledger_id: ledger_canister_id.to_string(),
-            code: err.0,
-            msg: err.1,
-        }),
-    }
+    // let args = TransferFromArgs {
+    //     spender_subaccount: None,
+    //     from: event.from_icp_address.into(),
+    //     to: ic_cdk::id().into(),
+    //     amount: event.amount.clone(),
+    //     fee: None,
+    //     created_at_time: Some(ic_cdk::api::time()),
+    //     memo: Some(LedgerMemo(event.get_burn_id()).into()),
+    // };
+
+    // match client.transfer_from(args).await {
+    //     Ok(Ok(block_index)) => {
+    //         let burn_block_index = block_index
+    //             .0
+    //             .to_u64()
+    //             .expect("block index should fit into u64");
+
+    //         // update event with the burn block index
+    //         event.update_after_burn(ic_cdk::api::time(), burn_block_index);
+
+    //         process_withdrawal_burn_event(&event, None);
+
+    //         Ok(event.clone())
+    //     }
+    //     Ok(Err(err)) => Err(WithdrawError::BurningGSolFailed(err)),
+    //     Err(err) => Err(WithdrawError::SendingMessageToLedgerFailed {
+    //         ledger_id: ledger_canister_id.to_string(),
+    //         code: err.0,
+    //         msg: err.1,
+    //     }),
+    // }
 }
 
 async fn generate_coupon(event: &mut WithdrawalEvent) -> Result<Coupon, WithdrawError> {

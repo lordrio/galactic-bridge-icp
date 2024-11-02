@@ -5,7 +5,7 @@ use crate::state::{
 };
 use crate::storage::total_event_count;
 
-use candid::{CandidType, Deserialize, Nat, Principal};
+use candid::{CandidType, Deserialize, Nat};
 use minicbor::{Decode, Encode};
 use num_bigint::ToBigUint;
 use std::fmt::{Display, Formatter};
@@ -20,9 +20,7 @@ pub struct InitArg {
     pub solana_initial_signature: String,
     #[n(3)]
     pub ecdsa_key_name: String,
-    #[cbor(n(4), with = "crate::cbor::principal")]
-    pub ledger_id: Principal,
-    #[cbor(n(5), with = "crate::cbor::nat")]
+    #[cbor(n(4), with = "crate::cbor::nat")]
     pub minimum_withdrawal_amount: Nat,
 }
 
@@ -34,7 +32,6 @@ impl TryFrom<InitArg> for State {
             solana_contract_address,
             solana_initial_signature,
             ecdsa_key_name,
-            ledger_id,
             minimum_withdrawal_amount,
         }: InitArg,
     ) -> Result<Self, Self::Error> {
@@ -50,7 +47,7 @@ impl TryFrom<InitArg> for State {
             solana_initial_signature,
             ecdsa_key_name,
             ecdsa_public_key: None,
-            ledger_id,
+            ecdsa_proxy_public_key: None,
             minimum_withdrawal_amount,
             solana_last_known_signature: None,
             solana_signature_ranges: Default::default(),

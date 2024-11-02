@@ -1,19 +1,16 @@
 {
   "version": 1,
   "output_env_file": ".env",
-  "dfx": "0.15.0",
   "canisters": {
     "minter": {
       "type": "rust",
       "package": "minter",
-      "candid": "src/minter/minter.did",
-      "shrink": false
+      "candid": "src/minter/minter.did"
     },
     "ledger": {
       "type": "custom",
       "wasm": "https://download.dfinity.systems/ic/3e25df8f16f794bc93caaefdce41467304d1b0c7/canisters/ic-icrc1-ledger.wasm.gz",
-      "candid": "https://raw.githubusercontent.com/dfinity/ic/3e25df8f16f794bc93caaefdce41467304d1b0c7/rs/rosetta-api/icrc1/ledger/ledger.did",
-      "shrink": false
+      "candid": "https://raw.githubusercontent.com/dfinity/ic/3e25df8f16f794bc93caaefdce41467304d1b0c7/rs/rosetta-api/icrc1/ledger/ledger.did"
     }
   },
   "defaults": {

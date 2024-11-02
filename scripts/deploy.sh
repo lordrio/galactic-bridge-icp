@@ -1,11 +1,8 @@
-#!/bin/bash
-
-# Default values
 NETWORK="local"
 CREATE_MINTER=false
 CREATE_LEDGER=false
+OWNER_PRINCIPAL_NAME="p5mpn-lgd4x-logst-tftlf-ocwbj-b53ah-5mgue-b665z-lv63u-mmvdj-iqe"
 
-# Parse command-line options
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --reinstall)

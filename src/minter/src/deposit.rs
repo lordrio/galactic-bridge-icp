@@ -5,19 +5,18 @@ use crate::{
     events::{DepositEvent, DepositEventError, SolanaSignature, SolanaSignatureRange},
     guard::TimerGuard,
     logs::{DEBUG, INFO},
-    sol_rpc_client::{responses::GetTransactionResponse, LedgerMemo, SolRpcClient, SolRpcError},
-    state::audit::process_event,
-    state::event::EventType,
-    state::{mutate_state, read_state, State, TaskType},
+    sol_rpc_client::{responses::GetTransactionResponse, SolRpcClient, SolRpcError},
+    state::{audit::process_event, event::EventType, mutate_state, read_state, State, TaskType},
     utils::{HashMapUtils, VecUtils},
+    BTOWN_CANISTER_STAGING,
 };
 
+use candid::Nat;
 use icrc_ledger_types::icrc1::transfer::TransferError;
-use num_traits::ToPrimitive;
 use std::collections::HashMap;
 
 const GET_SIGNATURES_BY_ADDRESS_LIMIT: u8 = 10;
-const GET_TRANSACTIONS_LIMIT: u8 = 1;
+const GET_TRANSACTIONS_LIMIT: u8 = 10;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DepositError {
@@ -327,19 +326,24 @@ fn process_transaction_logs(
 }
 
 pub async fn mint_gsol() {
-    use icrc_ledger_client_cdk::{CdkRuntime, ICRC1Client};
-    use icrc_ledger_types::icrc1::{account::Account, transfer::TransferArg};
-
     let _guard = match TimerGuard::new(TaskType::MintGSol) {
         Ok(guard) => guard,
         Err(_) => return,
     };
 
-    let ledger_canister_id = read_state(|s| s.ledger_id);
     // filter out all events that have reached the retry limit
     let filtered_events = HashMapUtils::filter(&read_state(|s| s.accepted_events.clone()), |e| {
         !e.retry.is_retry_limit_reached(MINT_GSOL_RETRY_LIMIT)
     });
+
+    if filtered_events.is_empty() {
+        ic_canister_log::log!(
+            DEBUG,
+            "\nMinting gSOL:\n{}",
+            HashMapUtils::format_keys_as_string(&filtered_events)
+        );
+        return;
+    }
 
     ic_canister_log::log!(
         DEBUG,
@@ -347,47 +351,88 @@ pub async fn mint_gsol() {
         HashMapUtils::format_keys_as_string(&filtered_events)
     );
 
-    let client = ICRC1Client {
-        runtime: CdkRuntime,
-        ledger_canister_id,
+    let array_events: Vec<DepositEvent> = filtered_events.values().cloned().collect();
+    let bton_events = serde_cbor::to_vec(&array_events).unwrap();
+
+    ic_cdk::println!("bton_events: {:?}", array_events);
+
+    let (result,): (Vec<Result<String, (String, String)>>,) = match ic_cdk::call(
+        BTOWN_CANISTER_STAGING,
+        "sol_mint_bton",
+        (bton_events.as_slice(),),
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            ic_canister_log::log!(DEBUG, "failed to mint bton, error: {:?}", err);
+            return;
+        }
     };
 
-    for (_, mut event) in filtered_events {
-        match client
-            .transfer(TransferArg {
-                from_subaccount: None,
-                to: Account {
-                    owner: event.to_icp_address,
-                    subaccount: None,
-                },
-                amount: event.amount.clone(),
-                fee: None,
-                created_at_time: Some(ic_cdk::api::time()),
-                // Memo is limited to 32 bytes in size, so can't fit much in there
-                memo: Some(LedgerMemo(event.id).into()),
-            })
-            .await
-        {
-            Ok(Ok(block_index)) => {
-                let block_index = block_index.0.to_u64().expect("nat does not fit into u64");
-                event.update_mint_block_index(block_index);
+    for res in result {
+        match res {
+            Ok(sig) => {
+                let mut event = filtered_events.get(&sig).unwrap().clone(); // Clone the event to make it mutable
+                event.update_mint_block_index(0);
                 process_minted_event(&event);
             }
-            Ok(Err(err)) => {
-                process_accepted_event(&event, Some(DepositError::MintingGSolFailed(err.clone())));
-            }
-            Err(err) => {
+            Err((sig, err)) => {
+                let event = filtered_events.get(&sig).unwrap().clone(); // Clone the event to make it mutable
                 process_accepted_event(
                     &event,
-                    Some(DepositError::SendingMessageToLedgerFailed {
-                        id: ledger_canister_id.to_string(),
-                        code: err.0,
-                        msg: err.1,
-                    }),
+                    Some(DepositError::MintingGSolFailed(
+                        TransferError::GenericError {
+                            error_code: Nat::from(0u8),
+                            message: err,
+                        },
+                    )),
                 );
             }
-        };
+        }
     }
+
+    // let client = ICRC1Client {
+    //     runtime: CdkRuntime,
+    //     ledger_canister_id,
+    // };
+
+    // for (_, mut event) in filtered_events {
+    //     match client
+    //         .transfer(TransferArg {
+    //             from_subaccount: None,
+    //             to: Account {
+    //                 owner: event.to_icp_address,
+    //                 subaccount: None,
+    //             },
+    //             amount: event.amount.clone(),
+    //             fee: None,
+    //             created_at_time: Some(ic_cdk::api::time()),
+    //             // Memo is limited to 32 bytes in size, so can't fit much in there
+    //             memo: Some(LedgerMemo(event.id).into()),
+    //         })
+    //         .await
+    //     {
+    //         Ok(Ok(block_index)) => {
+    //             let block_index = block_index.0.to_u64().expect("nat does not fit into u64");
+    //             event.update_mint_block_index(block_index);
+    //             process_minted_event(&event);
+    //         }
+    //         Ok(Err(err)) => {
+    //             process_accepted_event(&event, Some(DepositError::MintingGSolFailed(err.clone())));
+    //         }
+    //         Err(err) => {
+    //             process_accepted_event(
+    //                 &event,
+    //                 Some(DepositError::SendingMessageToLedgerFailed {
+    //                     id: ledger_canister_id.to_string(),
+    //                     code: err.0,
+    //                     msg: err.1,
+    //                 }),
+    //             );
+    //         }
+    //     };
+    // }
 }
 
 /// Process events

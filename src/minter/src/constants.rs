@@ -14,10 +14,12 @@ use std::time::Duration;
 // vec![1],
 pub const DERIVATION_PATH: Vec<ByteBuf> = vec![];
 
-pub const GET_LATEST_SOLANA_SIGNATURE: Duration = Duration::from_secs(1 * 60);
-pub const SCRAPPING_SOLANA_SIGNATURE_RANGES: Duration = Duration::from_secs(3 * 60);
-pub const SCRAPPING_SOLANA_SIGNATURES: Duration = Duration::from_secs(3 * 60);
+pub const GET_LATEST_SOLANA_SIGNATURE: Duration = Duration::from_secs(24 * 60 * 60);
+pub const SCRAPPING_SOLANA_SIGNATURE_RANGES: Duration = Duration::from_secs(24 * 60 * 60);
+pub const SCRAPPING_SOLANA_SIGNATURES: Duration = Duration::from_secs(24 * 60 * 60);
 pub const MINT_GSOL: Duration = Duration::from_secs(3 * 60);
+
+pub const LAST_CHECK_MIN: Duration = Duration::from_secs(5 * 60);
 
 pub const SOLANA_SIGNATURE_RANGES_RETRY_LIMIT: u8 = 100;
 pub const SOLANA_SIGNATURE_RETRY_LIMIT: u8 = 100;

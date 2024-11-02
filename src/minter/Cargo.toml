@@ -5,9 +5,8 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[[bin]]
-name = "minter"
-path = "src/main.rs"
+[lib]
+crate-type = ["cdylib"]
 
 
 [dependencies]
@@ -21,6 +20,7 @@ serde = "1.0.196"
 serde_json = "1.0.113"
 serde_bytes = "0.11"
 sha2 = "0.10.8"
+ciborium = "0.2.2"
 # Enable `custom` feature of k256's getrandom dependency. See lib.rs for more details.
 getrandom = { version = "0.2", features = ["custom"] }
 sha3 = "0.10.8"

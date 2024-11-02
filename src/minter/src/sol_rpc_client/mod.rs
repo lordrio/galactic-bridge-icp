@@ -1,5 +1,7 @@
 use crate::{
+    escda,
     lifecycle::SolanaRpcUrl,
+    sha3_256,
     sol_rpc_client::{
         requests::{GetSignaturesForAddressRequestOptions, GetTransactionRequestOptions},
         responses::{GetTransactionResponse, JsonRpcResponse, SignatureResponse},
@@ -9,8 +11,10 @@ use crate::{
         },
     },
     state::{mutate_state, read_state, State},
+    AGENT_TOKEN_N_EXPIRY, CHAIN_ID,
 };
 
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD as base64_url, Engine};
 use ic_cdk::api::{
     call::RejectionCode,
     management_canister::http_request::{
@@ -24,6 +28,10 @@ use std::collections::HashMap;
 pub mod requests;
 pub mod responses;
 pub mod types;
+
+pub const SECONDS: u64 = 1_000_000_000;
+pub const REFRESH_PROXY_TOKEN_INTERVAL: u64 = 60 * 60; // 60 minutes
+const AGENT_NAME: &str = "Pipans";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SolRpcClient {
@@ -70,7 +78,103 @@ impl SolRpcClient {
         Self::new(state.solana_rpc_url())
     }
 
+    async fn get_agent_token() -> String {
+        let (token, expire_at) = AGENT_TOKEN_N_EXPIRY.with(|t| t.borrow().clone());
+        if expire_at < (ic_cdk::api::time() / SECONDS) {
+            // expired
+            let expire_at = (ic_cdk::api::time() / SECONDS) + REFRESH_PROXY_TOKEN_INTERVAL;
+            let ecdsa_key_name = read_state(|s| s.ecdsa_key_name.clone());
+            let token = escda::sign_proxy_token(&ecdsa_key_name, expire_at + 120, AGENT_NAME)
+                .await
+                .unwrap();
+            AGENT_TOKEN_N_EXPIRY.with(|t| *t.borrow_mut() = (token.clone(), expire_at));
+            return token;
+        }
+
+        token
+    }
+
     async fn rpc_call(
+        &self,
+        payload: &String,
+        effective_size_estimate: u64,
+    ) -> Result<String, SolRpcError> {
+        //https://idempotent-proxy-cf-worker.rio-lee.workers.dev
+        let token = Self::get_agent_token().await;
+        let host = "idempotent-proxy-cf-worker.rio-lee.workers.dev";
+        let url = format!("https://{}/URL_SOLANA_DEVNET", host);
+
+        ic_cdk::println!("url: {}", url);
+
+        let chain_id = CHAIN_ID.with(|t| *t.borrow());
+        let next_chain =
+            sha3_256(format!("{}-{}", hex::encode(chain_id), ic_cdk::api::time()).as_bytes());
+        // update new chain id
+        CHAIN_ID.with_borrow_mut(|i| *i = next_chain);
+        let idempotent_key = format!("{}", base64_url.encode(next_chain));
+
+        ic_cdk::println!("idempotent_key: {}", idempotent_key);
+
+        let request_headers = vec![
+            HttpHeader {
+                name: "Host".to_string(),
+                value: format!("{host}:443"),
+            },
+            HttpHeader {
+                name: "Content-Type".to_string(),
+                value: "application/json".to_string(),
+            },
+            HttpHeader {
+                name: "idempotency-key".to_string(),
+                value: idempotent_key.to_string(),
+            },
+            HttpHeader {
+                name: "proxy-authorization".to_string(),
+                value: format!("Bearer {}", token),
+            },
+        ];
+
+        ic_cdk::println!("body: {}", payload);
+
+        let request = CanisterHttpRequestArgument {
+            url: url.to_string(),
+            method: HttpMethod::POST,
+            max_response_bytes: Some(effective_size_estimate),
+            body: Some(payload.as_bytes().to_vec()),
+            transform: Some(TransformContext::from_name(
+                "cleanup_response".to_owned(),
+                vec![],
+            )),
+            headers: request_headers,
+        };
+
+        let base_cycles = 400_000_000u128 + 100_000u128 * (2 * effective_size_estimate as u128);
+
+        const BASE_SUBNET_SIZE: u128 = 13;
+        const SUBNET_SIZE: u128 = 34;
+        let cycles = base_cycles * SUBNET_SIZE / BASE_SUBNET_SIZE;
+
+        match http_request(request, cycles).await {
+            Ok((response,)) => {
+                let str_body = String::from_utf8(response.body);
+                // ic_cdk::println!("response: {:?}", str_body);
+
+                match str_body {
+                    Ok(str_body) => Ok(str_body),
+                    Err(error) => {
+                        ic_cdk::println!("error 00 : {:?}", error);
+                        Err(SolRpcError::FromUtf8Failed(error.to_string()))
+                    }
+                }
+            }
+            Err((r, m)) => {
+                ic_cdk::println!("error 01 : {:?}, {:?}", r, m);
+                Err(SolRpcError::RequestFailed { code: r, msg: m })
+            }
+        }
+    }
+
+    async fn _rpc_call_unused(
         &self,
         payload: &String,
         effective_size_estimate: u64,

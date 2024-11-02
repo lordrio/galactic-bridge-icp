@@ -18,3 +18,5 @@ for canister in $(echo $CANISTERS | sed "s/,/ /g")
 do
     generate_did "$canister"
 done
+
+# candid-extractor target/wasm32-unknown-unknown/release/minter.wasm > src/minter/minter.did

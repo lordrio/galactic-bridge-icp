@@ -1,4 +1,5 @@
 use crate::constants::DERIVATION_PATH;
+use crate::escda;
 use crate::events::{DepositEvent, SolanaSignature, SolanaSignatureRange, WithdrawalEvent};
 use crate::lifecycle::{SolanaRpcUrl, UpgradeArg};
 
@@ -17,6 +18,10 @@ pub mod event;
 
 thread_local! {
   pub static STATE: RefCell<Option<State>> = RefCell::default();
+
+  pub static LAST_CHECKED: RefCell<u64> = RefCell::default();
+  pub static AGENT_TOKEN_N_EXPIRY: RefCell<(String, u64)> = RefCell::default();
+  pub static CHAIN_ID: RefCell<[u8; 32]> = RefCell::default();
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -47,7 +52,7 @@ pub struct State {
     pub ecdsa_key_name: String,
     // raw format of the public key
     pub ecdsa_public_key: Option<EcdsaPublicKeyResponse>,
-    pub ledger_id: Principal,
+    pub ecdsa_proxy_public_key: Option<String>,
     pub minimum_withdrawal_amount: BigUint,
 
     // scrapper config
@@ -90,11 +95,6 @@ impl State {
         if self.ecdsa_key_name.trim().is_empty() {
             return Err(InvalidStateError::InvalidEcdsaKeyName(
                 "ecdsa_key_name cannot be blank".to_string(),
-            ));
-        }
-        if self.ledger_id == Principal::anonymous() {
-            return Err(InvalidStateError::InvalidLedgerId(
-                "ledger_id cannot be the anonymous principal".to_string(),
             ));
         }
         if self.solana_contract_address.trim().is_empty() {
@@ -397,7 +397,6 @@ impl std::fmt::Display for State {
         if let Some(ecdsa_public_key) = &self.ecdsa_public_key {
             writeln!(f, "ECDSA Public Key: {:?}", ecdsa_public_key)?;
         }
-        writeln!(f, "Ledger ID: {}", self.ledger_id)?;
         writeln!(
             f,
             "Minimum Withdrawal Amount: {}",
@@ -498,7 +497,7 @@ pub async fn lazy_call_ecdsa_public_key() -> ic_crypto_ecdsa_secp256k1::PublicKe
         derivation_path: DERIVATION_PATH.into_iter().map(|x| x.to_vec()).collect(),
         key_id: EcdsaKeyId {
             curve: EcdsaCurve::Secp256k1,
-            name: key_name,
+            name: key_name.clone(),
         },
     })
     .await
@@ -510,6 +509,9 @@ pub async fn lazy_call_ecdsa_public_key() -> ic_crypto_ecdsa_secp256k1::PublicKe
     });
 
     mutate_state(|s| s.ecdsa_public_key = Some(response.clone()));
+
+    let proxy_public_key = escda::get_proxy_token_public_key(&key_name).await.unwrap();
+    mutate_state(|s| s.ecdsa_proxy_public_key = Some(proxy_public_key));
 
     to_public_key(&response)
 }

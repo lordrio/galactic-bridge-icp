@@ -3,12 +3,12 @@ use crate::{
         MINT_GSOL_RETRY_LIMIT, SOLANA_SIGNATURE_RANGES_RETRY_LIMIT, SOLANA_SIGNATURE_RETRY_LIMIT,
     },
     events::{DepositEvent, DepositEventError, SolanaSignature, SolanaSignatureRange},
+    get_btown_nft_canister,
     guard::TimerGuard,
     logs::{DEBUG, INFO},
     sol_rpc_client::{responses::GetTransactionResponse, SolRpcClient, SolRpcError},
     state::{audit::process_event, event::EventType, mutate_state, read_state, State, TaskType},
     utils::{HashMapUtils, VecUtils},
-    BTOWN_CANISTER_STAGING,
 };
 
 use candid::Nat;
@@ -355,10 +355,12 @@ pub async fn mint_gsol() {
     let bton_events = serde_cbor::to_vec(&array_events).unwrap();
 
     ic_cdk::println!("bton_events: {:?}", array_events);
+    ic_cdk::println!("bton_events_len: {:?}", bton_events.len());
+    ic_cdk::println!("bton_events_hex: {:?}", hex::encode(bton_events.as_slice()));
 
     let (result,): (Vec<Result<String, (String, String)>>,) = match ic_cdk::call(
-        BTOWN_CANISTER_STAGING,
-        "sol_mint_bton",
+        get_btown_nft_canister(),
+        "deposit_coins_from_solana",
         (bton_events.as_slice(),),
     )
     .await

@@ -1,6 +1,7 @@
 # galactic_bridge_icp
 
 ## Deployment
+
 Deploys ledger and minter
 
 ```bash
@@ -11,6 +12,7 @@ dfx start --background
 ```
 
 ## (Re)Generating candid file (minter.did)
+
 ```bash
 ./scripts/did.sh
 ```
@@ -18,6 +20,7 @@ dfx start --background
 # Flow examples
 
 ## Sol to gSol
+
 ```
 ┌────┐ ┌───────────────┐           ┌──────────┐┌──────────┐
 │User│ │Solana Contract│           │  Minter  ││  Ledger  │
@@ -37,6 +40,7 @@ dfx start --background
 ```
 
 ## gSol to Sol
+
 ```
  ┌───────────────┐ ┌────┐             ┌──────────┐┌──────────┐
  │Solana Contract│ │User│             │  Minter  ││  Ledger  │
@@ -57,8 +61,8 @@ dfx start --background
  │Solana Contract│ │User│             │  Minter  ││  Ledger  │
  └───────────────┘ └────┘             └──────────┘└──────────┘
 ```
-Coupon holds message(address to receive asset, amount, etc.), signature and public address and is used to release SOL from solana contract
 
+Coupon holds message(address to receive asset, amount, etc.), signature and public address and is used to release SOL from solana contract
 
 # Help
 
@@ -69,15 +73,18 @@ dfx canister call minter get_ledger_id
 ```
 
 ## get_address
+
 Returns Threshold ECDSA address ("ecdsa_public_key") in 3 formats:
-1) compressed public key (size: 33 bytes, generated from icp)
-2) uncompressed public key (size: 64 bytes, generated from compressed version via "libsecp256k1" library)
+
+1. compressed public key (size: 33 bytes, generated from icp)
+2. uncompressed public key (size: 64 bytes, generated from compressed version via "libsecp256k1" library)
 
 ```bash
 dfx canister call minter get_address
 ```
 
 ## withdraw
+
 Withdraw burns gsol and provides a coupon
 
 ```bash
@@ -96,6 +103,7 @@ dfx canister call minter withdraw "(\"HS6NTv6GBVSLct8dsimRWRvjczJTAgfgDJt8VpR8wt
 ```
 
 Coupon Example:
+
 ```rust
 {
     /// The recovery ID (y parity) for signature
@@ -111,9 +119,11 @@ Coupon Example:
     message_hash = "8278c60c27f95ccb2b0956c4b7ed9ef90e1ec67d3d8cf88cec39632d3f0d4bf0";
 }
 ```
+
 No matter who executes the withdrawal process on the Solana side, the asset will be reimbursed to the Solana address provided during the minter canister call.
 
 ## get_withdraw_info
+
 ```bash
 dfx canister call minter get_withdraw_info  --identity $USER_PRINCIPAL_NAME
 ```
@@ -137,11 +147,12 @@ dfx canister call minter get_active_tasks --identity="$OWNER_PRINCIPAL_NAME"
 ```
 
 # Known Issues
-1) Solana Testnet and Devnet do not retain transactions and transaction signatures for an extended period. This can lead to
+
+1. Solana Testnet and Devnet do not retain transactions and transaction signatures for an extended period. This can lead to
    issues in the Solana parser, such as encountering existing signatures without corresponding transaction data. Currently,
    any parsing issue encountered is retried up to 100 times before being dropped. It may be beneficial to implement a mechanism
    with progressively longer retry periods for improved handling of such issues.".
-2) Solana RPC provider free version has a request limit. At this point batching for transaction calls is not possible on mainnet!
+2. Solana RPC provider free version has a request limit. At this point batching for transaction calls is not possible on mainnet!
    Each call is duplicated 13 times for each node on the subnet.
 
 ## MAINNET PUBLIC KEY - test_key_1
@@ -155,7 +166,11 @@ dfx canister call minter get_active_tasks --identity="$OWNER_PRINCIPAL_NAME"
 "04c1ab9735077d400d7e992087ed3e09721ecd25d2238f5b6d0ec5f899aff090db0f3c5b976ca2305440f31367e3b5c51cb58413de5962714ea41015812ed5069f"
 
 ## LATEST SOLANA INITIAL SIGNATURE
+
 dhCUjkhdmEw18r1uNVxKanMyEXYmdcp56UBUmLXkgnPU8QFoHJYKy4UMrHLHk7oxUWXc13gvcL11ivCNJADaMJN
 
 ## SOLANA CONTRACT ADDRESS
+
 AAJL4DeXnWBNRowWjvpkAgwtAACpz6NfaA1T2p8Hrpy
+
+dfx ledger create-canister p5mpn-lgd4x-logst-tftlf-ocwbj-b53ah-5mgue-b665z-lv63u-mmvdj-iqe --amount 0.3 --ic --subnet mpubz-g52jc-grhjo-5oze5-qcj74-sex34-omprz-ivnsm-qvvhr-rfzpv-vae

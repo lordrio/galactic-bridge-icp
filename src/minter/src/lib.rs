@@ -32,12 +32,24 @@ use num_bigint::BigUint;
 use state::lazy_call_ecdsa_public_key;
 use std::time::Duration;
 
-static BTOWN_CANISTER_STAGING: Principal = Principal::from_slice(&[0, 0, 0, 0, 1, 48, 7, 10, 1, 1]);
-static BTOWN_CANISTER_MAINNET: Principal = Principal::from_slice(&[0, 0, 0, 0, 1, 48, 7, 10, 1, 1]);
+static BTOWN_CANISTER_LOCAL: Principal = Principal::from_slice(&[128, 0, 0, 0, 0, 16, 0, 12, 1, 1]);
+static _BTOWN_CANISTER_MAINNET: Principal =
+    Principal::from_slice(&[0, 0, 0, 0, 1, 16, 121, 223, 1, 1]);
+static BTOWN_CANISTER_STAGING: Principal =
+    Principal::from_slice(&[0, 0, 0, 0, 0, 224, 134, 65, 1, 1]);
+
+fn get_btown_nft_canister() -> Principal {
+    if option_env!("DFX_NETWORK").unwrap_or("local") == "ic" {
+        // BTOWN_CANISTER_MAINNET
+        BTOWN_CANISTER_STAGING
+    } else {
+        BTOWN_CANISTER_LOCAL
+    }
+}
 
 pub fn is_allowed_canister() -> Result<(), String> {
     let caller = ic_cdk::caller();
-    if caller == BTOWN_CANISTER_STAGING || caller == BTOWN_CANISTER_MAINNET {
+    if caller == get_btown_nft_canister() {
         Ok(())
     } else {
         Err("caller is not a valid canister".to_string())
@@ -147,7 +159,7 @@ fn post_upgrade(minter_arg: Option<MinterArg>) {
 }
 
 /// Returns the compressed and uncompressed public keys.
-#[update]
+#[query]
 pub async fn get_address() -> (String, String, String) {
     read_state(|s| {
         (
@@ -164,8 +176,7 @@ pub async fn get_address() -> (String, String, String) {
 ///
 /// * `solana_address` - The Solana address to withdraw GSOL tokens to.
 /// * `withdraw_amount` - The amount of GSOL tokens to withdraw.
-/// remember to guard with is_allowed_canister()
-#[update]
+#[update(guard = "is_allowed_canister")]
 async fn withdraw(
     solana_address: String,
     withdraw_amount: candid::Nat,
@@ -177,8 +188,8 @@ async fn withdraw(
 }
 
 // can only be called by allowed canisters
-// #[update(guard = "is_allowed_canister")]
-#[update]
+#[update(guard = "is_allowed_canister")]
+// #[update]
 async fn trigger_check() -> Result<(), String> {
     if LAST_CHECKED
         .with_borrow(|cell| ic_cdk::api::time() - *cell > LAST_CHECK_MIN.as_nanos() as u64)
@@ -204,7 +215,7 @@ async fn trigger_check() -> Result<(), String> {
 /// # Arguments
 ///
 /// * `burn_id` - Burn id of the coupon.
-#[update]
+#[update(guard = "is_allowed_canister")]
 async fn get_coupon(burn_id: u64) -> Result<Coupon, WithdrawError> {
     let caller = validate_caller_not_anonymous();
 
@@ -316,7 +327,7 @@ mod tests {
 
     #[test]
     fn test_to_bytearray() {
-        let hex = "020e8faf281f37e72a986f7cf2399803e0fbe5f1e6fd490712ffb723ec6f26ecad";
+        let hex = "023848ffecda8dccb6960db7d42c4accac0fa6dfc4419f1eef7b59991e979498f7";
         let array = hex::decode(hex).unwrap();
         let pk = PublicKey::parse_slice(&array, Some(PublicKeyFormat::Compressed)).unwrap();
         println!("{:?}", pk.serialize());

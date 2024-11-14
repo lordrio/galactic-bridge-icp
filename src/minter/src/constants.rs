@@ -17,7 +17,7 @@ pub const DERIVATION_PATH: Vec<ByteBuf> = vec![];
 pub const GET_LATEST_SOLANA_SIGNATURE: Duration = Duration::from_secs(4 * 60 * 60);
 pub const SCRAPPING_SOLANA_SIGNATURE_RANGES: Duration = Duration::from_secs(4 * 60 * 60);
 pub const SCRAPPING_SOLANA_SIGNATURES: Duration = Duration::from_secs(4 * 60 * 60);
-pub const MINT_GSOL: Duration = Duration::from_secs(3 * 60);
+pub const MINT_GSOL: Duration = Duration::from_secs(60 * 60);
 
 pub const LAST_CHECK_MIN: Duration = Duration::from_secs(5 * 60);
 

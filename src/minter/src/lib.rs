@@ -49,7 +49,7 @@ fn get_btown_nft_canister() -> Principal {
 
 pub fn is_allowed_canister() -> Result<(), String> {
     let caller = ic_cdk::caller();
-    if caller == get_btown_nft_canister() {
+    if caller == get_btown_nft_canister() || ic_cdk::api::is_controller(&caller) {
         Ok(())
     } else {
         Err("caller is not a valid canister".to_string())
@@ -77,29 +77,29 @@ fn setup_timers() {
     });
 
     // Set intervals for periodic tasks.
-    ic_cdk_timers::set_timer_interval(GET_LATEST_SOLANA_SIGNATURE, || {
-        ic_cdk::spawn(async {
-            get_latest_signature().await;
-        });
-    });
+    // ic_cdk_timers::set_timer_interval(GET_LATEST_SOLANA_SIGNATURE, || {
+    //     ic_cdk::spawn(async {
+    //         get_latest_signature().await;
+    //     });
+    // });
 
-    ic_cdk_timers::set_timer_interval(SCRAPPING_SOLANA_SIGNATURE_RANGES, || {
-        ic_cdk::spawn(async {
-            scrap_signature_range().await;
-        });
-    });
+    // ic_cdk_timers::set_timer_interval(SCRAPPING_SOLANA_SIGNATURE_RANGES, || {
+    //     ic_cdk::spawn(async {
+    //         scrap_signature_range().await;
+    //     });
+    // });
 
-    ic_cdk_timers::set_timer_interval(SCRAPPING_SOLANA_SIGNATURES, || {
-        ic_cdk::spawn(async {
-            scrap_signatures().await;
-        });
-    });
+    // ic_cdk_timers::set_timer_interval(SCRAPPING_SOLANA_SIGNATURES, || {
+    //     ic_cdk::spawn(async {
+    //         scrap_signatures().await;
+    //     });
+    // });
 
-    ic_cdk_timers::set_timer_interval(MINT_GSOL, || {
-        ic_cdk::spawn(async {
-            mint_gsol().await;
-        });
-    });
+    // ic_cdk_timers::set_timer_interval(MINT_GSOL, || {
+    //     ic_cdk::spawn(async {
+    //         mint_gsol().await;
+    //     });
+    // });
 }
 
 /// Initializes the Minter canister with the given arguments.

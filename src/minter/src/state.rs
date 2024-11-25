@@ -1,7 +1,6 @@
-use crate::constants::DERIVATION_PATH;
-use crate::escda;
 use crate::events::{DepositEvent, SolanaSignature, SolanaSignatureRange, WithdrawalEvent};
 use crate::lifecycle::{SolanaRpcUrl, UpgradeArg};
+use crate::{escda, get_derivation_path};
 
 use candid::Principal;
 use ic_cdk::api::management_canister::ecdsa::EcdsaPublicKeyResponse;
@@ -494,7 +493,10 @@ pub async fn lazy_call_ecdsa_public_key() -> ic_crypto_ecdsa_secp256k1::PublicKe
 
     let (response,) = ecdsa_public_key(EcdsaPublicKeyArgument {
         canister_id: None,
-        derivation_path: DERIVATION_PATH.into_iter().map(|x| x.to_vec()).collect(),
+        derivation_path: get_derivation_path()
+            .into_iter()
+            .map(|x| x.to_vec())
+            .collect(),
         key_id: EcdsaKeyId {
             curve: EcdsaCurve::Secp256k1,
             name: key_name.clone(),

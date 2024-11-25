@@ -1,6 +1,6 @@
 use crate::{
-    constants::DERIVATION_PATH,
     events::WithdrawalEvent,
+    get_derivation_path,
     guard::retrieve_sol_guard,
     logs::DEBUG,
     state::{audit::process_event, event::EventType, mutate_state, read_state, State},
@@ -421,7 +421,10 @@ impl WithdrawalEvent {
 
         let args = SignWithEcdsaArgument {
             message_hash: hashed_coupon.clone(),
-            derivation_path: DERIVATION_PATH.into_iter().map(|x| x.to_vec()).collect(),
+            derivation_path: get_derivation_path()
+                .into_iter()
+                .map(|x| x.to_vec())
+                .collect(),
             key_id: EcdsaKeyId {
                 curve: EcdsaCurve::Secp256k1,
                 name: read_state(|s| s.ecdsa_key_name.clone()),

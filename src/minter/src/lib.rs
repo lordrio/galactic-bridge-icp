@@ -19,6 +19,7 @@ use escda::*;
 use lifecycle::post_upgrade as lifecycle_post_upgrade;
 use lifecycle::*;
 pub use logs::*;
+use serde_bytes::ByteBuf;
 use state::*;
 use withdraw::{
     get_coupon as get_or_regen_coupon, get_withdraw_info as get_user_withdraw_info, withdraw_gsol,
@@ -44,6 +45,18 @@ fn get_btown_nft_canister() -> Principal {
         BTOWN_CANISTER_STAGING
     } else {
         BTOWN_CANISTER_LOCAL
+    }
+}
+
+fn get_derivation_path() -> Vec<ByteBuf> {
+    if option_env!("DFX_NETWORK").unwrap_or("local") == "ic" {
+        vec![
+            ByteBuf::from(vec![0x80]),
+            ByteBuf::from(vec![44]),
+            ByteBuf::from(_BTOWN_CANISTER_MAINNET.as_slice()),
+        ]
+    } else {
+        DERIVATION_PATH
     }
 }
 
@@ -77,29 +90,29 @@ fn setup_timers() {
     });
 
     // Set intervals for periodic tasks.
-    // ic_cdk_timers::set_timer_interval(GET_LATEST_SOLANA_SIGNATURE, || {
-    //     ic_cdk::spawn(async {
-    //         get_latest_signature().await;
-    //     });
-    // });
+    ic_cdk_timers::set_timer_interval(GET_LATEST_SOLANA_SIGNATURE, || {
+        ic_cdk::spawn(async {
+            get_latest_signature().await;
+        });
+    });
 
-    // ic_cdk_timers::set_timer_interval(SCRAPPING_SOLANA_SIGNATURE_RANGES, || {
-    //     ic_cdk::spawn(async {
-    //         scrap_signature_range().await;
-    //     });
-    // });
+    ic_cdk_timers::set_timer_interval(SCRAPPING_SOLANA_SIGNATURE_RANGES, || {
+        ic_cdk::spawn(async {
+            scrap_signature_range().await;
+        });
+    });
 
-    // ic_cdk_timers::set_timer_interval(SCRAPPING_SOLANA_SIGNATURES, || {
-    //     ic_cdk::spawn(async {
-    //         scrap_signatures().await;
-    //     });
-    // });
+    ic_cdk_timers::set_timer_interval(SCRAPPING_SOLANA_SIGNATURES, || {
+        ic_cdk::spawn(async {
+            scrap_signatures().await;
+        });
+    });
 
-    // ic_cdk_timers::set_timer_interval(MINT_GSOL, || {
-    //     ic_cdk::spawn(async {
-    //         mint_gsol().await;
-    //     });
-    // });
+    ic_cdk_timers::set_timer_interval(MINT_GSOL, || {
+        ic_cdk::spawn(async {
+            mint_gsol().await;
+        });
+    });
 }
 
 /// Initializes the Minter canister with the given arguments.
